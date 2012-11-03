@@ -5,6 +5,7 @@
 #Include require gems\libs
 require 'rubygems'
 require 'sinatra'
+require 'mongo'
 require 'mongoid'
 require 'haml'
 require 'json'
@@ -12,8 +13,10 @@ require 'rest_client'
 require 'digest'
 require 'encryptor'
 require 'base64'
+require "sinatra/streaming" # from Sinatra-contrib
 
-
+set :run, true
+set :server, %w[webrick thin mongrel]
 set :port, 4500
 
 rcOK  =  200
@@ -80,9 +83,14 @@ helpers do
     Blobs.find_by(:_id => id).to_json
   end
   
-  def object_id val
+  def object_id_from_string val
     Moped::BSON::ObjectId.from_string(val)
   end
+
+  def object_id_from_stringGridFs val
+    BSON::ObjectId.from_string(val)
+  end
+
 
 end
 
@@ -107,32 +115,37 @@ post '/blob/store/?' do
   content_type :json
   
   # get the parameters
-  jdata = JSON.parse(params[:data])
-  puts jdata
+  jdataArray = JSON.parse(params[:data])
+  puts jdataArray
   
-  if validateInput(jdata['blob'], jdata['validationRegex'] )
-    puts "Input validated successfully\n"
+  returnArray = Array.[]
+  
+  jdataArray.each { |jdata|
+	if validateInput(jdata['blob'], jdata['validationRegex'] )
+		puts "Input validated successfully\n"
 	
-	# encrypt the data
-	encBlob = encryptBlob(jdata['blob'], jdata['passPhrase'] )
+		# encrypt the data
+		encBlob = encryptBlob(jdata['blob'], jdata['passPhrase'] )
 
-    # write to mongodb
-    #TODO create a uuid
-    puts "Insert data into mongodb " + encBlob
-    blob = Blobs.new(blob: encBlob)
-	blob.save(validate: false)
-	
-	blobId = blob[:_id].to_s
-	puts "Inserted with id " + blobId
-  end  
+		# write to mongodb
+		#TODO create a uuid
+		puts "Insert data into mongodb " + encBlob
+		blob = Blobs.new(blob: encBlob)
+		blob.save(validate: false)
+		
+		blobId = blob[:_id].to_s
+		puts "Inserted with id " + blobId
+		
+		returnJson = { :storageKey    => blobId,
+					   :returnCode    => rcOK,
+                       :returnMessage => ""
+                     }
+        returnArray << returnJson
+	end
+  }
   
   # create return json object
-  returnJson = { :storageKey    => blobId,
-                 :returnCode    => rcOK,
-                 :returnMessage => ""
-               }.to_json
-  
-  returnJson
+  returnArray.to_json
 end
 
 #**********************************************************************
@@ -146,23 +159,28 @@ post '/blob/read' do
   content_type :json
   
   # get the parameters
-  jdata = JSON.parse(params[:data])
-  puts jdata
-  	
-  # extract row from data store
-  puts "id " + jdata['storageKey']
-  doc = JSON.parse(document_by_id( object_id( jdata['storageKey'] ) ))
-  puts doc
-  # decrypt the data
-  decBlob = decryptBlob(doc['blob'], jdata['passPhrase'] )
+  jdataArray = JSON.parse(params[:data])
+  puts jdataArray
+  
+  returnArray = Array.[]
+  
+  jdataArray.each { |jdata|
+	  # extract row from data store
+	  puts "id " + jdata['storageKey']
+	  doc = JSON.parse(document_by_id( object_id_from_string( jdata['storageKey'] ) ))
+	  puts doc
+	  # decrypt the data
+	  decBlob = decryptBlob(doc['blob'], jdata['passPhrase'] )
 
-  returnJson = { :storageKey    => jdata['storageKey'],
-				 :blob          => decBlob,
-                 :returnCode    => rcOK,
-                 :returnMessage => ""
-               }.to_json
+	  returnJson = { :storageKey    => jdata['storageKey'],
+					 :blob          => decBlob,
+					 :returnCode    => rcOK,
+					 :returnMessage => ""
+				   }				   
+      returnArray << returnJson
+   }
 
-  returnJson
+  returnArray.to_json
 end
 
 
@@ -177,24 +195,28 @@ post '/blob/retrieve/?' do
   content_type :json
   
   # get the parameters
-  jdata = JSON.parse(params[:data])
-  puts jdata
+  jdataArray = JSON.parse(params[:data])
+  puts jdataArray
   
-  if validateInput(jdata['blob'], jdata['validationRegex'] )
-    puts "Input validated successfully\n"
-	
-	# encrypt the data
-	encBlob = encryptBlob(jdata['blob'], jdata['passPhrase'] )
+  returnArray = Array.[]
+  
+  jdataArray.each { |jdata|
+	  if validateInput(jdata['blob'], jdata['validationRegex'] )
+		puts "Input validated successfully\n"
+		
+		# encrypt the data
+		encBlob = encryptBlob(jdata['blob'], jdata['passPhrase'] )
 
-  end  
-  
-  # create return json object
-  returnJson = { :encryptedBlob => encBlob,
-                 :returnCode    => rcOK,
-                 :returnMessage => ""
-               }.to_json
-  
-  returnJson
+	  end  
+	  # create return json object
+	  returnJson = { :encryptedBlob => encBlob,
+					 :returnCode    => rcOK,
+					 :returnMessage => ""
+				   }
+      returnArray << returnJson
+   }
+
+  returnArray.to_json
 end
 
 
@@ -209,17 +231,45 @@ end
 post '/blob/send/?' do
   content_type :json
   
-  # get the parameters
-  jdata = JSON.parse(params[:data])
-  puts jdata
-  	
-  # decrypt the data
-  decBlob = decryptBlob(jdata['encryptedBlob'], jdata['passPhrase'] )
+  jdataArray = JSON.parse(params[:data])
+  puts jdataArray
+  
+  returnArray = Array.[]
+  
+  jdataArray.each { |jdata|
+	  # decrypt the data
+	  decBlob = decryptBlob(jdata['encryptedBlob'], jdata['passPhrase'] )
 
-  returnJson = { :blob          => decBlob,
-                 :returnCode    => rcOK,
-                 :returnMessage => ""
-               }.to_json
+	  returnJson = { :blob          => decBlob,
+					 :returnCode    => rcOK,
+					 :returnMessage => ""
+				   }
+      returnArray << returnJson
+   }
 
-  returnJson
+  returnArray.to_json
+end
+
+
+# curl -G -d "id=50954b577506a463eb000031"  http://localhost:4500/stream
+get '/stream/?' do
+  puts params[:id]
+  stream do |out|
+  db = Mongo::Connection.new.db("mydb")
+  grid = Mongo::Grid.new(db)
+  # Retrieve the file
+  id = object_id_from_stringGridFs( params[:id] )
+  file = grid.get( id )
+  out << file.read()
+  #file.each {|chunk| out << chunk  }
+  end
+
+end
+
+
+# curl -v --location --upload-file d.bin http://localhost:4500/upload
+put '/upload/:id' do
+	db = Mongo::Connection.new.db("mydb")
+	grid = Mongo::Grid.new(db)	
+	id = grid.put(request.body.read)
 end
