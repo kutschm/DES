@@ -138,10 +138,22 @@ puts "\n!!!!!!!/blob/send RESULT!!!!!!! \n"
 
 
 puts "\n!!!!!!!Uploading file!!!!!!! \n" 
-response = RestClient.put mainUrl + '/upload', :myfile => File.new("README.md", 'rb')
+response = RestClient.put mainUrl + '/upload', :myfile => File.new("lorem.txt", 'rb')
 puts response
 puts "\n!!!!!!!Downloading file!!!!!!! \n" 
 response = RestClient.get mainUrl + '/stream?id=' + response
 file = File.open("retrievedFile.md", "w")
 file.write(response) 
 #puts "Respose: " + response
+
+
+
+puts "\n!!!!!!!Uploading file CHUNKS!!!!!!! \n" 
+response = RestClient.put mainUrl + '/upload2', :myfile => File.new("lorem.txt", 'rb')
+puts response
+puts "\n!!!!!!!Downloading file!!!!!!! \n" 
+response = RestClient.post mainUrl + '/stream2',
+							{:data => response}
+							
+file = File.open("retrievedLorem.txt", "w")
+file.write(response) 

@@ -50,7 +50,7 @@ end
 helpers do
   def encryptBlob blob, passPhrase   		
 	## TODO put encryption logic
-	puts "encrypting: " + blob + " using passphrase: " + passPhrase
+	#puts "encrypting: " + blob + " using passphrase: " + passPhrase
 	
 	secret_key = Digest::SHA256.hexdigest(passPhrase)
 	encrypted_value = Encryptor.encrypt(blob, :key => secret_key)
@@ -60,7 +60,7 @@ helpers do
   
   def decryptBlob blob, passPhrase   		
 	## TODO put encryption logic
-	puts "decrypting: " + blob + " using passphrase: " + passPhrase
+	#puts "decrypting: " + blob + " using passphrase: " + passPhrase
 
     encrypted_text = Base64::decode64(blob)
 
@@ -283,4 +283,62 @@ puts params
 	encBlob = encryptBlob(params['myfile'][:tempfile].read, 'passPhrase' )
 	id = grid.put(encBlob)	
 	id.to_s
+end
+
+
+################# CHUNKED encryption
+
+CHUNKSIZE = 262144
+
+class File
+  def each_chunk(chunk_size = CHUNKSIZE)
+    yield read(chunk_size) until eof?
+  end
+end
+
+# curl -v --location --upload-file d.bin http://localhost:4500/upload
+put '/upload2/?' do
+puts "upload chunks"
+puts params
+	db = Mongo::Connection.new.db("mydb")
+	grid = Mongo::Grid.new(db)	
+	
+	id = []
+	
+	puts "encrypt data"
+	open(params['myfile'][:tempfile], "rb") do |f|
+		f.each_chunk() {|chunk| 
+			puts "Processing chunk"
+			puts chunk.size
+			encBlob = encryptBlob(chunk, 'passPhrase' ) 
+			id << grid.put(encBlob)	}
+	end
+	id.to_json
+end
+
+
+post '/stream2/?' do
+
+  content_type :json
+	
+  puts "streaming data back chunks"
+  jdata = JSON.parse(params[:data])
+  puts jdata[0]['$oid']
+  stream do |out|
+  db = Mongo::Connection.new.db("mydb")
+  grid = Mongo::Grid.new(db)
+  # Retrieve the file
+  id = object_id_from_stringGridFs( jdata[0]['$oid'] )
+  file = grid.get( id )  
+  
+  file.each {|chunk| 
+   puts "Processing chunk"
+   puts chunk.size
+   decBlob = decryptBlob(chunk, 'passPhrase' )
+   out << decBlob
+   }
+  
+  #decBlob = decryptBlob(file.read(), 'passPhrase' )    
+  end
+
 end
