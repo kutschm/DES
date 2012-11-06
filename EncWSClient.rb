@@ -132,3 +132,16 @@ JSON.parse(response).each { |data|
 	puts "ReturnMessage: " + data['returnMessage'].to_s
 }
 puts "\n!!!!!!!/blob/send RESULT!!!!!!! \n"                           
+
+
+#### testing streaming GridIO #######
+
+
+puts "\n!!!!!!!Uploading file!!!!!!! \n" 
+response = RestClient.put mainUrl + '/upload', :myfile => File.new("README.md", 'rb')
+puts response
+puts "\n!!!!!!!Downloading file!!!!!!! \n" 
+response = RestClient.get mainUrl + '/stream?id=' + response
+file = File.open("retrievedFile.md", "w")
+file.write(response) 
+#puts "Respose: " + response

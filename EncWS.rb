@@ -16,7 +16,7 @@ require 'base64'
 require "sinatra/streaming" # from Sinatra-contrib
 
 set :run, true
-set :server, %w[webrick thin mongrel]
+set :server, %w[thin mongrel webrick]
 set :port, 4500
 
 rcOK  =  200
@@ -253,23 +253,34 @@ end
 
 # curl -G -d "id=50954b577506a463eb000031"  http://localhost:4500/stream
 get '/stream/?' do
+  puts "streaming data back"
   puts params[:id]
   stream do |out|
   db = Mongo::Connection.new.db("mydb")
   grid = Mongo::Grid.new(db)
   # Retrieve the file
   id = object_id_from_stringGridFs( params[:id] )
-  file = grid.get( id )
-  out << file.read()
-  #file.each {|chunk| out << chunk  }
+  file = grid.get( id )  
+  
+  #file.each {|chunk| 
+  #decBlob = decryptBlob(chunk, 'passPhrase' ) }
+  
+  decBlob = decryptBlob(file.read(), 'passPhrase' )
+  
+  out << decBlob
   end
 
 end
 
 
 # curl -v --location --upload-file d.bin http://localhost:4500/upload
-put '/upload/:id' do
+put '/upload/?' do
+puts params
 	db = Mongo::Connection.new.db("mydb")
 	grid = Mongo::Grid.new(db)	
-	id = grid.put(request.body.read)
+	
+	puts "encrypt data"
+	encBlob = encryptBlob(params['myfile'][:tempfile].read, 'passPhrase' )
+	id = grid.put(encBlob)	
+	id.to_s
 end
