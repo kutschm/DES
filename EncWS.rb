@@ -55,14 +55,14 @@ helpers do
 	secret_key = Digest::SHA256.hexdigest(passPhrase)
 	encrypted_value = Encryptor.encrypt(blob, :key => secret_key)
 		
-	Base64::encode64( encrypted_value )
+	Base64::encode64( encrypted_value )	
   end
   
   def decryptBlob blob, passPhrase   		
 	## TODO put encryption logic
 	#puts "decrypting: " + blob + " using passphrase: " + passPhrase
 
-    encrypted_text = Base64::decode64(blob)
+    encrypted_text = Base64::decode64(blob)   
 
     secret_key = Digest::SHA256.hexdigest(passPhrase)
     decrypted_value = Encryptor.decrypt(encrypted_text, :key => secret_key)
@@ -70,6 +70,27 @@ helpers do
 	decrypted_value
   end
 
+  def encryptBlobNB64 blob, passPhrase   		
+	## TODO put encryption logic
+	#puts "encrypting: " + blob + " using passphrase: " + passPhrase
+	
+	secret_key = Digest::SHA256.hexdigest(passPhrase)
+	encrypted_value = Encryptor.encrypt(blob, :key => secret_key)
+		
+	encrypted_value
+  end
+  
+  def decryptBlobNB64 blob, passPhrase   		
+	## TODO put encryption logic
+	#puts "decrypting: " + blob + " using passphrase: " + passPhrase
+
+    encrypted_text = blob
+
+    secret_key = Digest::SHA256.hexdigest(passPhrase)
+    decrypted_value = Encryptor.decrypt(encrypted_text, :key => secret_key)
+
+	decrypted_value
+  end
 
   def validateInput blob, regex
     
@@ -288,7 +309,7 @@ end
 
 ################# CHUNKED encryption
 
-CHUNKSIZE = 262144
+CHUNKSIZE = 300000
 
 class File
   def each_chunk(chunk_size = CHUNKSIZE)
@@ -308,10 +329,12 @@ puts params
 	puts "encrypt data"
 	open(params['myfile'][:tempfile], "rb") do |f|
 		f.each_chunk() {|chunk| 
-			puts "Processing chunk"
+			puts "Processing chunk upload"
 			puts chunk.size
 			encBlob = encryptBlob(chunk, 'passPhrase' ) 
+			puts encBlob.size
 			id << grid.put(encBlob)	}
+			puts id
 	end
 	id.to_json
 end
@@ -322,21 +345,23 @@ post '/stream2/?' do
   content_type :json
 	
   puts "streaming data back chunks"
-  jdata = JSON.parse(params[:data])
-  puts jdata[0]['$oid']
+  jdata = JSON.parse(params[:data])  
+  
   stream do |out|
   db = Mongo::Connection.new.db("mydb")
   grid = Mongo::Grid.new(db)
   # Retrieve the file
-  id = object_id_from_stringGridFs( jdata[0]['$oid'] )
-  file = grid.get( id )  
-  
-  file.each {|chunk| 
-   puts "Processing chunk"
-   puts chunk.size
-   decBlob = decryptBlob(chunk, 'passPhrase' )
-   out << decBlob
-   }
+  jdata.each { |x|     
+	  id = object_id_from_stringGridFs( x['$oid'] )
+	  file = grid.get( id )  
+	  
+	  decBlob = decryptBlob(file.read(), 'passPhrase' )
+	  #file.each {|chunk| 
+	   #puts "Processing chunk stream"
+	   #puts chunk.size
+	   #decBlob = decryptBlobNB64(chunk, 'passPhrase' )
+	   out << decBlob
+  }
   
   #decBlob = decryptBlob(file.read(), 'passPhrase' )    
   end
