@@ -1,0 +1,73 @@
+%h1 Encrypt using persistent storage
+%p  
+  :javascript
+
+    function appendReadOutputDiv(data) {
+       $("#readOutputDiv").append("<table>");
+               
+       var jsonData = JSON.parse(data);
+       for(var element in jsonData) {
+                 $("#readOutputDiv").append("<br><tr><td>Object ID: </td><td>" + jsonData[element].$oid + "</td></tr>");                
+       }
+    }
+    
+     function appendOutputDiv(data) {
+       $("#outputDiv").append("<p>" + data + "</p>");
+    }
+    
+    function decryptData() {              
+       var value = $("#objectIDs").val();
+       var str_array = value.split(',');
+       var inputArray = new Array();      
+       
+       for(var i = 0; i < str_array.length; i++) {
+         inputArray.push({"$oid": str_array[i]});
+         alert(str_array[i]);
+       }                           
+       
+       
+       $.ajax({ 
+             type: "POST",
+             contenttype: "multipart/form-data",
+             data: {data: JSON.stringify(inputArray)},
+             url: "http://localhost:4500/stream2/",
+             success: function(data) {
+                appendOutputDiv(data);
+             }});	  
+       
+    }
+
+    $(document).ready( function() {
+      $('#myForm').ajaxForm(function(data) {
+
+      
+      appendReadOutputDiv(data);
+
+      return false; //do not submit form the normal way
+     });  
+     
+     $('#retrieveButton').click(function() {
+        decryptData();
+    });  
+        
+    });
+
+  %p Encrypt File
+  %form(method="post" id="myForm" enctype='multipart/form-data' action='/file/')
+    %input(type='file' name='myfile')
+    %br
+    %input(type='submit' value='Upload!')
+
+  %p Output Encrypt
+  %div{:id => "readOutputDiv"}
+  
+  
+  %br
+  %br
+  %h1 Decrypt
+  %p Input Decrypt
+  %input{:type => "text", :id => "objectIDs"}
+  %button{:id => "retrieveButton"}Retrieve 
+  
+  %p Output Decrypt
+  %div{:id => "outputDiv"}

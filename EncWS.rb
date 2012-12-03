@@ -14,6 +14,7 @@ require 'digest'
 require 'encryptor'
 require 'base64'
 require "sinatra/streaming" # from Sinatra-contrib
+#require 'Haml'
 
 set :run, true
 set :server, %w[thin mongrel webrick]
@@ -124,6 +125,21 @@ get '/' do
   haml :index
 end
 
+get '/about' do  
+  haml :about  
+end 
+
+get '/store' do  
+  haml :store
+end 
+
+get '/otf' do  
+  haml :otf  
+end 
+
+get '/file' do  
+  haml :file
+end 
 
 #**********************************************************************
 #    blob/store
@@ -136,6 +152,7 @@ post '/blob/store/?' do
   content_type :json
   
   # get the parameters
+  puts(params)
   jdataArray = JSON.parse(params[:data])
   puts jdataArray
   
@@ -176,7 +193,7 @@ end
 # individually the web service returns them 
 # decrypted in plain text UTF8 back to the user.
 #
-post '/blob/read' do
+post '/blob/read/?' do
   content_type :json
   
   # get the parameters
@@ -340,9 +357,10 @@ puts params
 end
 
 
-post '/stream2/?' do
+post '/stream2/?', provides: 'text/event-stream' do
 
-  content_type :json
+  #content_type :json
+  #content_type 'text/event-stream'
 	
   puts "streaming data back chunks"
   jdata = JSON.parse(params[:data])  
@@ -363,7 +381,29 @@ post '/stream2/?' do
 	   out << decBlob
   }
   
-  #decBlob = decryptBlob(file.read(), 'passPhrase' )    
+  #decBlob = decryptBlob(file.read(), 'passPhrase' )      
   end
 
+end
+
+
+post '/file/?' do
+puts "upload chunks"
+puts params
+	db = Mongo::Connection.new.db("mydb")
+	grid = Mongo::Grid.new(db)	
+	
+	id = []
+	
+	puts "encrypt data"
+	open(params['myfile'][:tempfile], "rb") do |f|
+		f.each_chunk() {|chunk| 
+			puts "Processing chunk upload"
+			puts chunk.size
+			encBlob = encryptBlob(chunk, 'passPhrase' ) 
+			puts encBlob.size
+			id << grid.put(encBlob)	}
+			puts id
+	end
+	id.to_json
 end

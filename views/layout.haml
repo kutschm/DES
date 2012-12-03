@@ -1,0 +1,35 @@
+!!!  
+%html  
+  %head  
+    %title Data Encryption Service    
+    %link(rel="stylesheet" href="http://yui.yahooapis.com/2.8.0r4/build/reset/reset-min.css")  
+    %link(rel="stylesheet" href="css/styles.css")  
+    %script(type="text/javascript" src="jquery.js")
+    %script(type="text/javascript" src="jqueryForms.js")
+  %body  
+    #wrapper  
+      #header  
+        %h1 Data Encryption Service
+        %h2 This application allows you to encrypt and decrypt arbitrary blocks of data
+      #nav  
+        %ol  
+          %a(href="/")  
+            %li Home  
+          %a(href="/store")  
+            %li Store
+          %a(href="/otf")  
+            %li On the Fly
+          %a(href="/file")  
+            %li File
+          %a(href="about")  
+            %li About
+      #content  
+        =yield  
+      #side_bar  
+        %h1 Side Bar  
+        %p  
+          This is the side bar of the webpage  
+      #footer  
+        %p  
+          %b Copyright: 
+          Jesse Jackson, Marcel Kutsch

@@ -1,0 +1,117 @@
+%h1 Encrypt on the fly
+%p  
+  :javascript
+  
+    function addEncryptRow() {
+      $("#InputTable").append("<tr><td><label>Blob</label> <textarea></textarea></td><td><label>PassPhrase</label> <input type = 'text'></input></td><td><label>Validation RegEx</label> <input type = 'text'></input></td></tr>");
+    }
+    
+    function addReadEncryptRow() {
+      $("#ReadInputTable").append("<tr><td><label>PassPhrase</label> <input type = 'text'></input></td><td><label>StorageKey</label> <input type = 'text'></input></td></tr>");
+    }
+    
+    function appendOutputDiv(data) {
+       $("#outputDiv").append("<table>");               
+               for(var element in data) {
+                 $("#outputDiv").append("<br><tr><td>ReturnCode: </td><td>" + data[element].returnCode + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>ReturnMessage: </td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>EncryptedBlob: </td><td>" + data[element].encryptedBlob + "</td></tr>");
+               }
+    }
+    
+    function appendReadOutputDiv(data) {
+       $("#readOutputDiv").append("<table>");
+               
+       for(var element in data) {
+                 $("#readOutputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[element].returnCode + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>Blob:</td><td>" + data[element].blob + "</td></tr>");
+       }
+    }
+
+  
+    function encryptData() {      
+      var inputArray = new Array();      
+      var inputBlob = "";
+      var passPhrase = "";
+      var valRegex = "";
+      
+      var table = document.getElementById("InputTable");
+      for (var i = 0, row; row = table.rows[i]; i++) {
+        inputBlob = row.cells[0].childNodes[2].value;
+        passPhrase = row.cells[1].childNodes[2].value;
+        validationRegex = row.cells[2].childNodes[2].value;
+      
+        inputArray.push({"blob": inputBlob, "passPhrase": passPhrase, "validationRegex": valRegex});
+      }                
+            
+      $.ajax({ 
+             type: "POST",
+             datatype: "json",
+             traditional: true,
+             contenttype: "application/json; charset=utf-8",
+             data: {data: JSON.stringify(inputArray)},
+             url: "http://localhost:4500/blob/retrieve/",
+             success: function(data) {
+                appendOutputDiv(data);
+             }});	  
+    }
+    
+    function decryptData() {
+      
+      var inputArray = new Array();      
+      var passPhrase = "";
+      var encryptedBlob = "";
+      
+      var table = document.getElementById("ReadInputTable");
+      for (var i = 0, row; row = table.rows[i]; i++) {
+        passPhrase = row.cells[0].childNodes[2].value;
+        encryptedBlob = row.cells[1].childNodes[2].value;
+      
+        inputArray.push({"passPhrase": passPhrase, "encryptedBlob": encryptedBlob});
+      }
+                  
+      $.ajax({ 
+             type: "POST",
+             datatype: "json",
+             traditional: true,
+             contenttype: "application/json; charset=utf-8",
+             data: {data: JSON.stringify(inputArray)},
+             url: "http://localhost:4500/blob/send/",
+             success: function(data) {
+                appendReadOutputDiv(data);
+             }});	  
+    }
+
+    $(document).ready( function() {
+      $('#storeButton').click(function() {
+        encryptData();
+    });
+    $('#retrieveButton').click(function() {
+        decryptData();
+    });
+    
+    } );
+    
+  %p Input Encrypt
+  %div{:id => "InputDiv"}
+  %a{:href => "javascript:addEncryptRow()"} add item
+  %table{:id => "InputTable"}
+       
+  %button{:id => "storeButton"}store 
+  
+  %p Output Encrypt
+  %div{:id => "outputDiv"}
+
+  %br
+  %br
+  %h1 Decrypt
+  %p Input Decrypt
+  %a{:href => "javascript:addReadEncryptRow()"} add item
+  %table{:id => "ReadInputTable"}
+
+  %button{:id => "retrieveButton"}Retrieve 
+  
+  %p Output Decrypt
+  %div{:id => "readOutputDiv"}
+
