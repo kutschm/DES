@@ -1,4 +1,4 @@
-%h1 Encrypt on the fly
+%h1 Create link to encrypted data
 %p  
   :javascript
   
@@ -13,9 +13,9 @@
     function appendOutputDiv(data) {
        $("#outputDiv").append("<table>");               
                for(var element in data) {
-                 $("#outputDiv").append("<br><tr><td>ReturnCode: </td><td>" + data[element].returnCode + "</td></tr>");
-                 $("#outputDiv").append("<tr><td>ReturnMessage: </td><td>" + data[element].returnMessage + "</td></tr>");
-                 $("#outputDiv").append("<tr><td>EncryptedBlob: </td><td>" + data[element].encryptedBlob + "</td></tr>");
+                 $("#outputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[element].returnCode + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>Generated Link:</td><td>" + "http://localhost:4567/getlink/" + data[element].storageKey + "</td></tr>");
                }
     }
     
@@ -25,6 +25,7 @@
        for(var element in data) {
                  $("#readOutputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[element].returnCode + "</td></tr>");
                  $("#readOutputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>StorageKey:</td><td>" + data[element].storageKey + "</td></tr>");
                  $("#readOutputDiv").append("<tr><td>Blob:</td><td>" + data[element].blob + "</td></tr>");
        }
     }
@@ -51,7 +52,7 @@
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4567/blob/retrieve/",
+             url: "http://localhost:4567/blob/store/",
              success: function(data) {
                 appendOutputDiv(data);
              }});	  
@@ -61,14 +62,14 @@
       
       var inputArray = new Array();      
       var passPhrase = "";
-      var encryptedBlob = "";
+      var storageKey = "";
       
       var table = document.getElementById("ReadInputTable");
       for (var i = 0, row; row = table.rows[i]; i++) {
         passPhrase = row.cells[0].childNodes[2].value;
-        encryptedBlob = row.cells[1].childNodes[2].value;
+        storageKey = row.cells[1].childNodes[2].value;
       
-        inputArray.push({"passPhrase": passPhrase, "encryptedBlob": encryptedBlob});
+        inputArray.push({"passPhrase": passPhrase, "storageKey": storageKey});
       }
                   
       $.ajax({ 
@@ -77,7 +78,7 @@
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4567/blob/send/",
+             url: "http://cohort-encws.cloudfoundry.com/blob/read/",
              success: function(data) {
                 appendReadOutputDiv(data);
              }});	  
@@ -98,20 +99,9 @@
   %a{:href => "javascript:addEncryptRow()"} add item
   %table{:id => "InputTable"}
        
-  %button{:id => "storeButton"}store 
+  %button{:id => "storeButton"}create link 
   
   %p Output Encrypt
   %div{:id => "outputDiv"}
 
-  %br
-  %br
-  %h1 Decrypt
-  %p Input Decrypt
-  %a{:href => "javascript:addReadEncryptRow()"} add item
-  %table{:id => "ReadInputTable"}
-
-  %button{:id => "retrieveButton"}Retrieve 
-  
-  %p Output Decrypt
-  %div{:id => "readOutputDiv"}
 

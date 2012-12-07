@@ -52,7 +52,7 @@
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4500/blob/store/",
+             url: "http://localhost:4567/blob/store/",
              success: function(data) {
                 appendOutputDiv(data);
              }});	  
@@ -78,7 +78,7 @@
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4500/blob/read/",
+             url: "http://localhost:4567/blob/read/",
              success: function(data) {
                 appendReadOutputDiv(data);
              }});	  

@@ -1,0 +1,13 @@
+
+
+%h1 Decrypt from link
+%form{:action => "/showlink", :method => "post"}
+  %legend
+    Internal storage key
+  %p
+    %input{:type => "text", :name => "link", :value => @link}
+    %label{:for => ""} What is your passphrase?
+    %input{:type => "textbox", :name => "phrase", :id => "phrase"}
+  %p
+    %input{:type => "submit", :value => "Submit!"}
+

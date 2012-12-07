@@ -1,4 +1,4 @@
-%h1 Encrypt on the fly
+%h1 Encrypt using persistent storage
 %p  
   :javascript
   
@@ -13,9 +13,9 @@
     function appendOutputDiv(data) {
        $("#outputDiv").append("<table>");               
                for(var element in data) {
-                 $("#outputDiv").append("<br><tr><td>ReturnCode: </td><td>" + data[element].returnCode + "</td></tr>");
-                 $("#outputDiv").append("<tr><td>ReturnMessage: </td><td>" + data[element].returnMessage + "</td></tr>");
-                 $("#outputDiv").append("<tr><td>EncryptedBlob: </td><td>" + data[element].encryptedBlob + "</td></tr>");
+                 $("#outputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[element].returnCode + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#outputDiv").append("<tr><td>StorageKey:</td><td>" + data[element].storageKey + "</td></tr>");
                }
     }
     
@@ -25,6 +25,7 @@
        for(var element in data) {
                  $("#readOutputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[element].returnCode + "</td></tr>");
                  $("#readOutputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[element].returnMessage + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>StorageKey:</td><td>" + data[element].storageKey + "</td></tr>");
                  $("#readOutputDiv").append("<tr><td>Blob:</td><td>" + data[element].blob + "</td></tr>");
        }
     }
@@ -51,7 +52,7 @@
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4567/blob/retrieve/",
+             url: "http://localhost:4567/blob/store/",
              success: function(data) {
                 appendOutputDiv(data);
              }});	  
@@ -61,23 +62,19 @@
       
       var inputArray = new Array();      
       var passPhrase = "";
-      var encryptedBlob = "";
-      
-      var table = document.getElementById("ReadInputTable");
-      for (var i = 0, row; row = table.rows[i]; i++) {
-        passPhrase = row.cells[0].childNodes[2].value;
-        encryptedBlob = row.cells[1].childNodes[2].value;
-      
-        inputArray.push({"passPhrase": passPhrase, "encryptedBlob": encryptedBlob});
-      }
-                  
+      var storageKey = "";
+
+      passPhrase = "#{@phrase}";
+      storageKey = "#{@link}";
+      inputArray.push({"passPhrase": passPhrase, "storageKey": storageKey});        
+    
       $.ajax({ 
              type: "POST",
              datatype: "json",
              traditional: true,
              contenttype: "application/json; charset=utf-8",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4567/blob/send/",
+             url: "http://localhost:4567/blob/read/",
              success: function(data) {
                 appendReadOutputDiv(data);
              }});	  
@@ -93,25 +90,13 @@
     
     } );
     
-  %p Input Encrypt
-  %div{:id => "InputDiv"}
-  %a{:href => "javascript:addEncryptRow()"} add item
-  %table{:id => "InputTable"}
-       
-  %button{:id => "storeButton"}store 
-  
-  %p Output Encrypt
-  %div{:id => "outputDiv"}
 
-  %br
-  %br
+  %p Validate your passphrase
+  %p== #{@phrase}
   %h1 Decrypt
   %p Input Decrypt
-  %a{:href => "javascript:addReadEncryptRow()"} add item
-  %table{:id => "ReadInputTable"}
 
-  %button{:id => "retrieveButton"}Retrieve 
+  %button{:id => "retrieveButton"}Decrypt 
   
   %p Output Decrypt
   %div{:id => "readOutputDiv"}
-

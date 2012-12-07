@@ -6,7 +6,7 @@
 require 'rubygems'
 require 'sinatra'
 require 'mongo'
-require 'mongoid'
+require 'mongo_mapper'
 require 'haml'
 require 'json'
 require 'rest_client'
@@ -16,9 +16,9 @@ require 'base64'
 require "sinatra/streaming" # from Sinatra-contrib
 #require 'Haml'
 
-set :run, true
-set :server, %w[thin mongrel webrick]
-set :port, 4500
+#set :run, true
+#set :server, %w[thin mongrel webrick]
+#set :port, 4500
 
 rcOK  =  200
 rcERR =  400 
@@ -28,28 +28,31 @@ rcERR =  400
 
 # This is a encrypted data store model
 class Blobs
-  include Mongoid::Document
+  include MongoMapper::Document
   #field :dataId, :type => String
-  field :blob,   :type => String
+  key :blob, String
 
   #Validate
   #validates_uniqueness_of :dataId
   
 end
 
+    MongoMapper.connection = Mongo::Connection.new('localhost', 27017)
+    MongoMapper.database = "encws"
+
 #**********************************************************************
 #Configure MongoDB block
-configure do
+#configure do
 
-	Mongoid.load!("./config/mongoid.yml", :development)
+#	Mongoid.load!("./config/mongoid.yml", :development)
 
-end
+#end
 
 
 #**********************************************************************
 #Helper functions
 helpers do
-  def encryptBlob blob, passPhrase   		
+  def encryptBlob blob, passPhrase   	
 	## TODO put encryption logic
 	#puts "encrypting: " + blob + " using passphrase: " + passPhrase
 	
@@ -102,11 +105,11 @@ helpers do
   end
   
   def document_by_id id
-    Blobs.find_by(:_id => id).to_json
+    Blobs.where(:_id => id).first.to_json
   end
   
   def object_id_from_string val
-    Moped::BSON::ObjectId.from_string(val)
+    BSON::ObjectId.from_string(val)
   end
 
   def object_id_from_stringGridFs val
@@ -140,6 +143,22 @@ end
 get '/file' do  
   haml :file
 end 
+
+get '/createlink' do
+  haml :createlink
+end
+
+get '/getlink/:link' do|link|
+  @link = link
+  haml :getlink
+  #haml :getlink, :locals => { :link => link }
+end
+
+post '/showlink' do
+  @link = params["link"]
+  @phrase = params["phrase"]
+  haml :showlink
+end
 
 #**********************************************************************
 #    blob/store

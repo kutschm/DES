@@ -5,9 +5,10 @@
     function appendReadOutputDiv(data) {
        $("#readOutputDiv").append("<table>");
                
+               alert(data);
        var jsonData = JSON.parse(data);
        for(var element in jsonData) {
-                 $("#readOutputDiv").append("<br><tr><td>Object ID: </td><td>" + jsonData[element].$oid + "</td></tr>");                
+                 $("#readOutputDiv").append("<br><tr><td>Object ID: </td><td>" + jsonData[element] + "</td></tr>");                
        }
     }
     
@@ -30,7 +31,7 @@
              type: "POST",
              contenttype: "multipart/form-data",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4500/stream2/",
+             url: "http://localhost:4567/stream2/",
              success: function(data) {
                 appendOutputDiv(data);
              }});	  
