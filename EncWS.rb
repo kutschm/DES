@@ -76,9 +76,10 @@ class ReturnWrapper
 end
 
 class ChunkWrapper
-   def initialize(chunk, id)
+   def initialize(chunk, id, grabbed)
       @chunk=chunk
       @id=id
+      @grabbed=grabbed
    end
    
    def getChunk
@@ -87,6 +88,14 @@ class ChunkWrapper
    
    def getId
      @id
+   end
+   
+   def getGrabbed
+     @grabbed
+   end
+   
+   def setGrabbed(grab)
+	@grabbed = grab
    end
    
 end
@@ -529,14 +538,15 @@ puts params
     returnArray.to_json
 end
 
-
+# to be used
 post '/file3/?' do
 puts "upload chunks"
 puts params
 
 	retCode = rcOK
     retMsg = ""
-
+    myMutex = Mutex.new
+    resource = ConditionVariable.new
 	id = 0
 	enum = 0
 	blobsToId = nil
@@ -544,64 +554,95 @@ puts params
 	uuid = uuid.generate.to_s
 	puts uuid
 	returnArray = Array.[]
-    pool = Thread::Pool.new(5)
+    pool = Thread::Pool.new(10)
 	channel = Thread::Channel.new { |o| o}
 
 		   a = Thread.new {
-				while true
-				  puts "checking queue"
+				while true do
+				  #puts "checking queue"
 				  chunkItem = channel.receive()
-				  puts "received " + chunkItem.getId().to_s
+				  #puts "received " + chunkItem.getId().to_s
 				  if (chunkItem.getId() == -1)
 				     puts "over"
 				     break
 				  else
-                    puts "Use pool" 
-					pool.process() {
-					    myChunkItem = chunkItem.clone()
-						db = Mongo::Connection.new.db("mydb")
-						grid = Mongo::Grid.new(db)		
-					  
-						puts "Processing chunk upload "
-						#puts chunk.size
-						encBlob = encryptBlob(myChunkItem.getChunk(), params['passPhrase'] )
-						puts encBlob.size
-						id = grid.put(encBlob)
-						id = id.to_s
-						blobsToId = BlobsToSingleId.new(uid: uuid, order: myChunkItem.getId(), blobId: id)
-						puts "saving to mongo"						
-						blobsToId.save(validate: false)						
-						puts "saving: " + uuid + " " + myChunkItem.getId().to_s + " " + id
-					}					                 
+                    #puts "Use pool" 
+                    pool.process() {
+					    myChunkItem = nil
+					    myChunkId = -1
+					    myMutex.synchronize do					  
+					      #puts "got mutex"
+					      if( !chunkItem.getGrabbed() )					      					       
+						    myChunkItem = chunkItem.getChunk()
+						    myChunkId = chunkItem.getId()
+						    chunkItem.setGrabbed(true)		
+						    #puts "grabbed chunk" + chunkItem.getGrabbed().to_s
+						  else
+						    #puts " not grabbed"
+					      end
+					    end
+					    if(myChunkItem != nil)
+							db = Mongo::Connection.new.db("mydb")
+							grid = Mongo::Grid.new(db)		
+						  
+							encBlob = encryptBlob(myChunkItem, params['passPhrase'] )						
+							id = grid.put(encBlob)
+							id = id.to_s
+							blobsToId = BlobsToSingleId.new(uid: uuid, order: myChunkId, blobId: id)
+						
+							blobsToId.save(validate: false)						
+							#puts "saving: " + uuid + " " + myChunkId.to_s + " " + id
+						end
+					}			
+ 					
+							                 
                   end
+                  #puts "check for grabbed"
+                 # puts "trying to get mutex"
+                       sleep 0.02
+                       #puts "waiting to be grabbed" + chunkItem.getGrabbed().to_s
+					      while true do
+					        grabbed = false
+					        myMutex.synchronize do
+                               grabbed = chunkItem.getGrabbed()
+                            end
+                            if (grabbed == false)
+					     #    puts "waiting to be grabbed"						    
+						   else
+						 #    puts "next"
+						     break
+					      end
+					    end
                 end                 
                 
-                puts "ending " + pool.backlog.to_s
+                #puts "ending " + pool.backlog.to_s
                 #pool.join
                 while(pool.backlog != 0)
-					puts "pool not empty" + pool.backlog.to_s					
+					puts "pool not empty" + pool.backlog.to_s
 					sleep 0.5
 				end
 				puts "shutting down pool"
-                pool.shutdown
+               # pool.shutdown
 		   }
 		   a.run
 
 	puts "encrypt data"	
 	open(params['myfile'][:tempfile], "rb") do |f|	
 		f.each_chunk() {|chunk|		
-		   chunkW = ChunkWrapper.new(chunk, enum);
+		   chunkW = ChunkWrapper.new(chunk, enum, false);
 		   channel.send chunkW		   
 		   enum += 1   
         }
-        sleep 2
-        puts "sending -1"
-        chunkW = ChunkWrapper.new(nil, -1);               
-        channel.send chunkW		   
-        
-        a.join
-		
 	end
+	        #sleep 10
+        #puts "sending -1"
+        chunkW = ChunkWrapper.new(nil, -1, true);               
+			channel.send chunkW		           
+
+	a.join
+		#puts "joining"
+
+	puts "returning"
     returnJson = { :storageKey    => uuid,
 	   		       :returnCode    => retCode,
 				   :returnMessage => retMsg
@@ -637,7 +678,7 @@ post '/stream3/?', provides: 'text/event-stream' do
 	   #puts chunk.size
 	   #decBlob = decryptBlobNB64(chunk, 'passPhrase' )
 	   if(decBlob.getError() == 200)
-	    puts "successful"
+	    puts "successful" + decBlob.getValue()
 		out << decBlob.getValue()
 	   else
 	     out << "storageKey: " + decBlob.getValue().to_s + 
@@ -706,16 +747,17 @@ puts params
 	open(params['myfile'][:tempfile], "rb") do |f|	
 		f.each_chunk() {|chunk|		
 		   myChunk = chunk.clone()
-		   chunkW = ChunkWrapper.new(myChunk, enum);
+		   chunkW = ChunkWrapper.new(myChunk, enum, false);
 		   channel.send chunkW		   
 		   enum += 1   
         }
-        sleep 5
+        #sleep 5
 #        puts "sending -1"
-        chunkW = ChunkWrapper.new(nil, -1);               
-        #channel.send chunkW		   
+        chunkW = ChunkWrapper.new(nil, -1, false);               
+        channel.send chunkW		   
         
-	    while(pool.backlog > 0)	
+	    while(pool.backlog > 0)
+	        puts "backlog " + pool.backlog	
 	       sleep 0.5
 	    end
 	    
