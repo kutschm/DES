@@ -7,7 +7,7 @@
     }
     
     function addReadEncryptRow() {
-      $("#ReadInputTable").append("<tr><td><label>PassPhrase</label> <input type = 'text'></input></td><td><label>StorageKey</label> <input type = 'text'></input></td></tr>");
+      $("#ReadInputTable").append("<tr><td><label>PassPhrase</label> <input type = 'text'></input></td><td><label>EncryptedBlob</label> <input type = 'text'></input></td></tr>");
     }
     
     function appendOutputDiv(data) {
@@ -40,7 +40,7 @@
       for (var i = 0, row; row = table.rows[i]; i++) {
         inputBlob = row.cells[0].childNodes[2].value;
         passPhrase = row.cells[1].childNodes[2].value;
-        validationRegex = row.cells[2].childNodes[2].value;
+        valRegex = row.cells[2].childNodes[2].value;
       
         inputArray.push({"blob": inputBlob, "passPhrase": passPhrase, "validationRegex": valRegex});
       }                

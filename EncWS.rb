@@ -23,6 +23,8 @@ require "sinatra/streaming" # from Sinatra-contrib
 rcOK  =  200
 rcERR =  400 
 
+
+
 #**********************************************************************
 #Model Classes
 
@@ -39,6 +41,28 @@ end
 
     MongoMapper.connection = Mongo::Connection.new('localhost', 27017)
     MongoMapper.database = "encws"
+
+class ReturnWrapper
+   @rcOK = 200
+   @rcERR = 400
+   def initialize(value, error, msg)
+      @decryptValue=value
+      @error=error
+      @errorMessage=msg
+   end
+   
+   def getError
+     @error
+   end
+   
+   def getValue
+     @decryptValue
+   end
+   
+   def getMessage
+     @errorMessage
+   end
+end
 
 #**********************************************************************
 #Configure MongoDB block
@@ -65,57 +89,48 @@ helpers do
   def decryptBlob blob, passPhrase   		
 	## TODO put encryption logic
 	#puts "decrypting: " + blob + " using passphrase: " + passPhrase
-
+    
     encrypted_text = Base64::decode64(blob)   
-
+    if(encrypted_text == "")
+      return ReturnWrapper.new(nil, 400, "Incomplete encrypted data");
+    end
     secret_key = Digest::SHA256.hexdigest(passPhrase)
     decrypted_value = Encryptor.decrypt(encrypted_text, :key => secret_key)
+    decryptValue = ReturnWrapper.new(decrypted_value, 200, "");    
+    rescue OpenSSL::Cipher::CipherError => e
+      decryptValue = ReturnWrapper.new(decrypted_value, 400, "Invalid Password");
 
-	decrypted_value
+	decryptValue
   end
 
-  def encryptBlobNB64 blob, passPhrase   		
-	## TODO put encryption logic
-	#puts "encrypting: " + blob + " using passphrase: " + passPhrase
-	
-	secret_key = Digest::SHA256.hexdigest(passPhrase)
-	encrypted_value = Encryptor.encrypt(blob, :key => secret_key)
-		
-	encrypted_value
-  end
-  
-  def decryptBlobNB64 blob, passPhrase   		
-	## TODO put encryption logic
-	#puts "decrypting: " + blob + " using passphrase: " + passPhrase
-
-    encrypted_text = blob
-
-    secret_key = Digest::SHA256.hexdigest(passPhrase)
-    decrypted_value = Encryptor.decrypt(encrypted_text, :key => secret_key)
-
-	decrypted_value
-  end
 
   def validateInput blob, regex
     
-    ## TODO put validation logic
-    puts "validating: " + blob + " using regex: " + regex
-    
-    true
+    regexp = Regexp.new(regex);
+    (regexp.match(blob))? true : false;
+        
   end
   
   def document_by_id id
-    Blobs.where(:_id => id).first.to_json
+    Blobs.where(:_id => id).first            
   end
   
   def object_id_from_string val
-    BSON::ObjectId.from_string(val)
+    oid = BSON::ObjectId.from_string(val)
+    id = ReturnWrapper.new(oid, 200 , "");
+    rescue BSON::InvalidObjectId => e
+        id = ReturnWrapper.new(nil, 400, "Invalid StorageKey");
+    id
   end
 
   def object_id_from_stringGridFs val
-    BSON::ObjectId.from_string(val)
+    oid = BSON::ObjectId.from_string(val)
+    id = ReturnWrapper.new(oid, 200, "");
+    rescue BSON::InvalidObjectId => e
+      id = ReturnWrapper.new(nil, 400, "Invalid StorageKey");
+    
+    id
   end
-
 
 end
 
@@ -170,6 +185,8 @@ post '/blob/store/?' do
   
   content_type :json
   
+  retCode = rcOK
+  retMsg = ""
   # get the parameters
   puts(params)
   jdataArray = JSON.parse(params[:data])
@@ -193,12 +210,18 @@ post '/blob/store/?' do
 		blobId = blob[:_id].to_s
 		puts "Inserted with id " + blobId
 		
-		returnJson = { :storageKey    => blobId,
-					   :returnCode    => rcOK,
-                       :returnMessage => ""
-                     }
-        returnArray << returnJson
+		retCode = rcOK;		
+		retMsg  = "Encrypted Data stored successfully";
+    else        
+		retCode = rcERR;
+		retMsg  = "Input validation failed for provided regex."
 	end
+	
+	returnJson = { :storageKey    => blobId,
+				   :returnCode    => retCode,
+				   :returnMessage => retMsg
+				 }
+	returnArray << returnJson	
   }
   
   # create return json object
@@ -215,6 +238,8 @@ end
 post '/blob/read/?' do
   content_type :json
   
+  retCode = rcOK
+  retMsg = ""
   # get the parameters
   jdataArray = JSON.parse(params[:data])
   puts jdataArray
@@ -224,15 +249,24 @@ post '/blob/read/?' do
   jdataArray.each { |jdata|
 	  # extract row from data store
 	  puts "id " + jdata['storageKey']
-	  doc = JSON.parse(document_by_id( object_id_from_string( jdata['storageKey'] ) ))
-	  puts doc
-	  # decrypt the data
-	  decBlob = decryptBlob(doc['blob'], jdata['passPhrase'] )
-
+	  
+	  obj = object_id_from_string( jdata['storageKey'] )
+	  if ( obj.getError() == 200 )	  
+	    doc = document_by_id( obj.getValue() )
+	    if (doc != nil)	      
+	      doc = JSON.parse(doc.to_json)
+	      puts doc
+	      # decrypt the data
+	      obj = decryptBlob(doc['blob'], jdata['passPhrase'] )      
+	    else
+	      obj = ReturnWrapper.new(nil, 400, "Document does not exist")
+	    end
+      end	  
+      
 	  returnJson = { :storageKey    => jdata['storageKey'],
-					 :blob          => decBlob,
-					 :returnCode    => rcOK,
-					 :returnMessage => ""
+					 :blob          => obj.getValue(),
+					 :returnCode    => obj.getError(),
+					 :returnMessage => obj.getMessage()
 				   }				   
       returnArray << returnJson
    }
@@ -251,6 +285,8 @@ post '/blob/retrieve/?' do
   
   content_type :json
   
+  retCode = rcOK
+  retMsg = ""
   # get the parameters
   jdataArray = JSON.parse(params[:data])
   puts jdataArray
@@ -264,12 +300,18 @@ post '/blob/retrieve/?' do
 		# encrypt the data
 		encBlob = encryptBlob(jdata['blob'], jdata['passPhrase'] )
 
-	  end  
+		retCode = rcOK;		
+		retMsg  = "Data encrypted successfully";
+	  else        
+		retCode = rcERR;
+		retMsg  = "Input validation failed for provided regex."
+	  end
+
 	  # create return json object
-	  returnJson = { :encryptedBlob => encBlob,
-					 :returnCode    => rcOK,
-					 :returnMessage => ""
-				   }
+	returnJson = { :encryptedBlob    => encBlob,
+				   :returnCode    => retCode,
+				   :returnMessage => retMsg
+				 }
       returnArray << returnJson
    }
 
@@ -297,9 +339,9 @@ post '/blob/send/?' do
 	  # decrypt the data
 	  decBlob = decryptBlob(jdata['encryptedBlob'], jdata['passPhrase'] )
 
-	  returnJson = { :blob          => decBlob,
-					 :returnCode    => rcOK,
-					 :returnMessage => ""
+	  returnJson = { :blob          => decBlob.getValue,
+					 :returnCode    => decBlob.getError(),
+					 :returnMessage => decBlob.getMessage()
 				   }
       returnArray << returnJson
    }
