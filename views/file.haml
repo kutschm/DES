@@ -3,13 +3,12 @@
   :javascript
 
     function appendReadOutputDiv(data) {
-       $("#readOutputDiv").append("<table>");
-               
-       var jsonData = JSON.parse(data);
-       for(var element in jsonData) {
-                 $("#readOutputDiv").append("<br><tr><td>Object ID: </td><td>" + jsonData[element] + "</td></tr>");                
-       }
+       $("#readOutputDiv").append("<table>");                              
+                 $("#readOutputDiv").append("<br><tr><td>ReturnCode:</td><td>" + data[0].returnCode + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>ReturnMessage:</td><td>" + data[0].returnMessage + "</td></tr>");
+                 $("#readOutputDiv").append("<tr><td>StorageKey:</td><td>" + data[0].storageKey + "</td></tr>");              
     }
+
     
     function errorHandler(e) {
       var msg = '';
@@ -91,31 +90,29 @@
     
     function decryptData() {              
        var value = $("#objectIDs").val();
+       var phrase = $("#passPhrase").val();
        var str_array = value.split(',');
        var inputArray = new Array();      
-       
+              
        for(var i = 0; i < str_array.length; i++) {
-         inputArray.push({"$oid": str_array[i]});
-         //alert(str_array[i]);
-       }                           
-       
+         inputArray.push({"$oid": str_array[i], "passPhrase": phrase});
+       }                                  
        
        $.ajax({ 
              type: "POST",
              contenttype: "multipart/form-data",
              data: {data: JSON.stringify(inputArray)},
-             url: "http://localhost:4567/stream2/",
+             url: "http://localhost:4567/stream3/",
              success: function(data) {
                 appendOutputDiv(data);
-             }});	  
-       
+             }});	        
     }
 
     $(document).ready( function() {
       $('#myForm').ajaxForm(function(data) {
 
       
-      appendReadOutputDiv(data);
+      appendReadOutputDiv(JSON.parse(data));
 
       return false; //do not submit form the normal way
      });  
@@ -129,8 +126,11 @@
     });
 
   %p Encrypt File
-  %form(method="post" id="myForm" enctype='multipart/form-data' action='/file/')
+  %form(method="post" id="myForm" enctype='multipart/form-data' action='/file2/')
     %input(type='file' name='myfile')
+    %br
+    %label{:for => ""} What is your passphrase?
+    %input(type='text' name='passPhrase')
     %br
     %input(type='submit' value='Upload!')
 
@@ -142,7 +142,11 @@
   %br
   %h1 Decrypt
   %p Input Decrypt
+  %label{:for => ""} What is your file ID?
   %input{:type => "text", :id => "objectIDs"}
+  %br
+  %label{:for => ""} What is your passphrase?
+  %input{:type => "text", :id => "passPhrase"}
   %button{:id => "retrieveButton"}Retrieve 
   
   %p Output Decrypt

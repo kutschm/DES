@@ -14,6 +14,7 @@ require 'digest'
 require 'encryptor'
 require 'base64'
 require "sinatra/streaming" # from Sinatra-contrib
+require "uuid"
 #require 'Haml'
 
 #set :run, true
@@ -36,6 +37,14 @@ class Blobs
 
   #Validate
   #validates_uniqueness_of :dataId
+  
+end
+
+class BlobsToSingleId
+  include MongoMapper::Document
+  key :uid, String
+  key :order, Integer
+  key :blodId, String
   
 end
 
@@ -63,14 +72,6 @@ class ReturnWrapper
      @errorMessage
    end
 end
-
-#**********************************************************************
-#Configure MongoDB block
-#configure do
-
-#	Mongoid.load!("./config/mongoid.yml", :development)
-
-#end
 
 
 #**********************************************************************
@@ -122,7 +123,7 @@ helpers do
         id = ReturnWrapper.new(nil, 400, "Invalid StorageKey");
     id
   end
-
+  
   def object_id_from_stringGridFs val
     oid = BSON::ObjectId.from_string(val)
     id = ReturnWrapper.new(oid, 200, "");
@@ -467,4 +468,86 @@ puts params
 			puts id
 	end
 	id.to_json
+end
+
+
+post '/file2/?' do
+puts "upload chunks"
+puts params
+	db = Mongo::Connection.new.db("mydb")
+	grid = Mongo::Grid.new(db)		
+	
+	retCode = rcOK
+    retMsg = ""
+
+	id = 0
+	enum = 0
+	blobsToId = nil
+	uuid = UUID.new
+	uuid = uuid.generate.to_s
+	puts uuid
+	returnArray = Array.[]
+	
+	puts "encrypt data"
+	open(params['myfile'][:tempfile], "rb") do |f|
+		f.each_chunk() {|chunk|
+			puts "Processing chunk upload"
+			#puts chunk.size
+			encBlob = encryptBlob(chunk, params['passPhrase'] )
+			#puts encBlob.size
+			id = grid.put(encBlob)
+			id = id.to_s
+			blobsToId = BlobsToSingleId.new(uid: uuid, order: enum, blobId: id)
+			blobsToId.save(validate: false)
+			puts "saving: " + uuid + " " + enum.to_s + " " + id
+			enum += 1   
+    }
+	end
+    returnJson = { :storageKey    => uuid,
+	   		       :returnCode    => retCode,
+				   :returnMessage => retMsg
+				 }
+    returnArray << returnJson
+
+    returnArray.to_json
+end
+
+
+post '/stream3/?', provides: 'text/event-stream' do
+	  
+  jdata = JSON.parse(params[:data])  
+  puts "streaming data back chunks " + jdata.to_s
+  
+  stream do |out|
+  db = Mongo::Connection.new.db("mydb")
+  grid = Mongo::Grid.new(db)
+  
+  # Retrieve the file
+  jdata.each { |x| 
+      puts "ID " + x['$oid'].to_s
+      ids = BlobsToSingleId.where(:uid => x['$oid'].to_s ).sort(:order.asc)
+      ids.each { |y|
+        puts ids
+        
+	    id = object_id_from_stringGridFs( y['blobId'] )
+	    file = grid.get( id.getValue() )
+	  	  
+	    decBlob = decryptBlob(file.read(), x['passPhrase'] ) 
+	  #file.each {|chunk| 
+	   #puts "Processing chunk stream"
+	   #puts chunk.size
+	   #decBlob = decryptBlobNB64(chunk, 'passPhrase' )
+	   if(decBlob.getError() == 200)
+		out << decBlob.getValue()
+	   else
+	     out << "storageKey: " + decBlob.getValue().to_s + 
+	   		    "returnCode: " + decBlob.getError().to_s + 
+				"returnMessage: " + decBlob.getMessage()     				     
+	   end
+	}
+  }
+  
+  #decBlob = decryptBlob(file.read(), 'passPhrase' )      
+  end
+
 end
