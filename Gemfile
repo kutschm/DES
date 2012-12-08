@@ -1,0 +1,13 @@
+source "http://rubygems.org"
+
+gem "sinatra"
+gem "mongo_mapper"
+gem "encryptor"
+gem "mongo"
+gem "json"
+gem "bson"
+gem "bson_ext"
+gem "haml"
+gem "rest-client"
+gem "encryptor"
+gem "sinatra-contrib"
